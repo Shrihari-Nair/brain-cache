@@ -1,0 +1,23 @@
+flowchart TD
+  S([START]) --> plan
+  plan -->|route| dispatch
+  dispatch -->|investigation done and no root cause - regression| synthesize
+  dispatch -->|coding done and verifier pending| verify
+  dispatch -->|steps still ready| dispatch
+  dispatch -->|step failed twice / budget| finish
+  synthesize --> dispatch
+  verify -->|verifier step failed| replan
+  verify -->|passed, verifier done, publish step pending| publish_prepare
+  replan -->|new plan| dispatch
+  replan -->|3rd failure| finish
+  publish_prepare -->|policy deny / tool error| finish
+  publish_prepare -->|policy require_approval: status awaiting_approval| await_decision
+  publish_prepare -->|policy allow: not_required| publish_pr
+  await_decision -->|interrupt: worker releases task as paused| await_decision
+  await_decision -->|approved| publish_pr
+  await_decision -->|rejected: publish step failed| replan
+  await_decision -->|expired| finish
+  publish_pr -->|PR created, plan complete| finish
+  publish_pr -->|blocked or tool error| finish
+  finish --> reflect
+  reflect --> E([END])

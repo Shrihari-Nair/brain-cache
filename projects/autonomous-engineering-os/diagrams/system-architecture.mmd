@@ -1,0 +1,44 @@
+flowchart TB
+  subgraph Clients
+    WEB[Next.js dashboard :3100]
+    CLI[aeos CLI / terminal client]
+  end
+  subgraph Control["Control plane: one process (aeos serve) or separate aeos worker"]
+    API[FastAPI app.py: /tasks /approvals /events SSE]
+    WRK[Worker: claim lease, heartbeat, housekeeping]
+    G[LangGraph graph: plan dispatch synthesize verify replan publish_prepare await_decision publish_pr finish reflect]
+    RT[Runtime: LLMs, RiskGate, RetryPolicy, SandboxManager, MemoryManager]
+  end
+  subgraph Specialists["Specialists (in-process OR A2A services)"]
+    AN[analytics]
+    RE[research]
+    CO[coding]
+  end
+  subgraph MCP["MCP servers (stdio child processes)"]
+    M1[observability]
+    M2[database read-only]
+    M3[github: git remote + PR store]
+    M4[web]
+  end
+  SB[(Docker sandbox: no network)]
+  PG[(Postgres: aeos.tasks, aeos.events, aeos.approvals, aeos.audit_log, vcs.*, LangGraph checkpoints, memory)]
+  LLM[Gemini API]
+  GH[Real GitHub]
+  OBS[OTel collector -> Langfuse]
+  WEB --> API
+  CLI --> API
+  API -->|enqueue / decide / cancel| PG
+  WRK -->|claim FOR UPDATE SKIP LOCKED| PG
+  WRK --> G
+  G <-->|checkpoint every node| PG
+  G --> RT
+  RT --> AN & RE & CO
+  AN --> M1 & M2
+  RE --> M3 & M4
+  CO --> SB
+  CO --> M3
+  G -->|publish_prepare / publish_pr via ToolRuntime| M3
+  M3 -->|only after approval| GH
+  RT --> LLM
+  G -. spans .-> OBS
+  G -->|DbSink thread| PG

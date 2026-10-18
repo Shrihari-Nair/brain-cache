@@ -1,0 +1,19 @@
+stateDiagram-v2
+  [*] --> queued: tasks.enqueue (POST /tasks, aeos submit)
+  queued --> running: tasks.claim (lease, attempts+1)
+  running --> running: heartbeat renews lease every lease_s/3
+  running --> queued: lease expired (worker died) and attempts < max
+  running --> queued: release_with_error (unexpected exception)
+  running --> escalated: claim guard: attempts >= max_attempts
+  running --> paused: graph hit interrupt (awaiting approval)
+  paused --> queued: apply_decision / expire_due (enqueue_resume, same txn)
+  running --> completed: PR created
+  running --> failed: finish node status failed
+  running --> escalated: retries/replans exhausted, denied, expired
+  queued --> cancelled: POST /tasks/id/cancel
+  running --> cancelled: cancel (worker fenced at next heartbeat)
+  paused --> cancelled: cancel
+  completed --> [*]
+  failed --> [*]
+  escalated --> [*]
+  cancelled --> [*]
